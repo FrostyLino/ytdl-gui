@@ -92,6 +92,10 @@ def build_command(url: str, fmt: str, quality: str, output_dir: str) -> list[str
 # ---------------------------------------------------------------------------
 # Main application
 # ---------------------------------------------------------------------------
+# Progress template — yt-dlp outputs this on each tick so we can parse reliably.
+_PROGRESS_TPL = "YTDLGUI:%(progress._percent_str)s"
+
+
 class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -100,6 +104,7 @@ class App(tk.Tk):
         self._proc: subprocess.Popen | None = None
         self._downloading = False
         self._cancelled = False
+        self._download_pass = 1  # 1 = first stream, 2 = second stream
         self._last_error_lines: list[str] = []
         self._config = load_config()
         self._input_widgets: list[tk.Widget] = []
@@ -294,6 +299,7 @@ class App(tk.Tk):
 
         self._downloading = True
         self._cancelled = False
+        self._download_pass = 1
         self._last_error_lines.clear()
         self.dl_btn.config(state="disabled")
         self.cancel_btn.config(state="normal")
@@ -305,6 +311,9 @@ class App(tk.Tk):
         cmd = build_command(
             url, self.fmt_var.get(), self.quality_var.get(), out_dir
         )
+        # Add structured progress template for reliable parsing
+        cmd.insert(1, "--progress-template")
+        cmd.insert(2, _PROGRESS_TPL)
         thread = threading.Thread(target=self._run_download, args=(cmd,), daemon=True)
         thread.start()
 
@@ -323,6 +332,7 @@ class App(tk.Tk):
                 text=True,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
+            last_pct = 0.0
             for line in self._proc.stdout:  # type: ignore[union-attr]
                 line = line.strip()
                 if not line:
@@ -333,11 +343,26 @@ class App(tk.Tk):
                 if len(self._last_error_lines) > 10:
                     self._last_error_lines.pop(0)
 
-                # Parse progress: "[download]  45.2% of ~50MiB at 3.5MiB/s ETA 00:08"
-                m = re.search(r"(\d+(?:\.\d+)?)%", line)
-                if m:
-                    self.after(0, self.progress_var.set, float(m.group(1)))
-                self.after(0, self.status_var.set, line[:90])
+                # Parse structured progress: "YTDLGUI: 45.2%"
+                if line.startswith("YTDLGUI:"):
+                    m = re.search(r"(\d+(?:\.\d+)?)%", line)
+                    if m:
+                        raw_pct = float(m.group(1))
+                        # Detect second pass (progress drops significantly)
+                        if raw_pct < last_pct - 10:
+                            self._download_pass = 2
+                        last_pct = raw_pct
+                        # Map to overall progress: pass 1 = 0-50%, pass 2 = 50-100%
+                        if self._download_pass == 1 and self.fmt_var.get() == "mp4":
+                            display_pct = raw_pct * 0.5
+                        elif self._download_pass == 2:
+                            display_pct = 50 + raw_pct * 0.5
+                        else:
+                            display_pct = raw_pct  # audio-only = single pass
+                        self.after(0, self.progress_var.set, display_pct)
+                else:
+                    # Show non-progress status lines (merging, extracting, etc.)
+                    self.after(0, self.status_var.set, line[:90])
 
             self._proc.wait()
 
