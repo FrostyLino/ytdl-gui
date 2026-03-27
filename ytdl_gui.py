@@ -140,6 +140,8 @@ class App(tk.Tk):
         fmt_frame.pack(side="left", fill="y", padx=(0, 6))
 
         saved_fmt = self._config.get("format", "mp4")
+        if saved_fmt not in QUALITY_OPTIONS:
+            saved_fmt = "mp4"
         self.fmt_var = tk.StringVar(value=saved_fmt)
         for val in ("mp4", *AUDIO_FORMATS):
             ttk.Radiobutton(
@@ -252,12 +254,28 @@ class App(tk.Tk):
         if self._downloading:
             return
 
+        # Validate output directory
+        out_dir = self.dir_var.get()
+        if not os.path.isdir(out_dir):
+            create = messagebox.askyesno(
+                "Folder not found",
+                f"The folder does not exist:\n{out_dir}\n\nCreate it?",
+            )
+            if create:
+                try:
+                    os.makedirs(out_dir, exist_ok=True)
+                except OSError as exc:
+                    messagebox.showerror("Error", f"Could not create folder:\n{exc}")
+                    return
+            else:
+                return
+
         # Persist current settings
         save_config(
             {
                 "format": self.fmt_var.get(),
                 "quality": self.quality_var.get(),
-                "output_dir": self.dir_var.get(),
+                "output_dir": out_dir,
             }
         )
 
@@ -270,7 +288,7 @@ class App(tk.Tk):
         self.status_var.set("Starting…")
 
         cmd = build_command(
-            url, self.fmt_var.get(), self.quality_var.get(), self.dir_var.get()
+            url, self.fmt_var.get(), self.quality_var.get(), out_dir
         )
         thread = threading.Thread(target=self._run_download, args=(cmd,), daemon=True)
         thread.start()
