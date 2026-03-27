@@ -102,6 +102,7 @@ class App(tk.Tk):
         self._cancelled = False
         self._last_error_lines: list[str] = []
         self._config = load_config()
+        self._input_widgets: list[tk.Widget] = []
         self._build_ui()
         self._check_deps()
 
@@ -125,12 +126,11 @@ class App(tk.Tk):
         url_frame.pack(fill="x", **pad)
 
         self.url_var = tk.StringVar()
-        ttk.Entry(url_frame, textvariable=self.url_var, width=55).pack(
-            side="left", padx=(8, 4), pady=6, fill="x", expand=True
-        )
-        ttk.Button(url_frame, text="Paste", width=6, command=self._paste_url).pack(
-            side="right", padx=(0, 8), pady=6
-        )
+        url_entry = ttk.Entry(url_frame, textvariable=self.url_var, width=55)
+        url_entry.pack(side="left", padx=(8, 4), pady=6, fill="x", expand=True)
+        paste_btn = ttk.Button(url_frame, text="Paste", width=6, command=self._paste_url)
+        paste_btn.pack(side="right", padx=(0, 8), pady=6)
+        self._input_widgets.extend([url_entry, paste_btn])
 
         # Format + Quality row
         opts_frame = ttk.Frame(self)
@@ -145,13 +145,15 @@ class App(tk.Tk):
             saved_fmt = "mp4"
         self.fmt_var = tk.StringVar(value=saved_fmt)
         for val in ("mp4", *AUDIO_FORMATS):
-            ttk.Radiobutton(
+            rb = ttk.Radiobutton(
                 fmt_frame,
                 text=val.upper(),
                 value=val,
                 variable=self.fmt_var,
                 command=self._on_format_change,
-            ).pack(side="left", padx=8, pady=6)
+            )
+            rb.pack(side="left", padx=8, pady=6)
+            self._input_widgets.append(rb)
 
         # Quality
         q_frame = ttk.LabelFrame(opts_frame, text="Quality")
@@ -165,6 +167,7 @@ class App(tk.Tk):
             width=14,
         )
         self.quality_combo.pack(padx=8, pady=6)
+        self._input_widgets.append(self.quality_combo)
         self._on_format_change()  # populate initial values
 
         # Restore saved quality if it matches current format
@@ -178,12 +181,11 @@ class App(tk.Tk):
 
         saved_dir = self._config.get("output_dir", DEFAULT_OUTPUT_DIR)
         self.dir_var = tk.StringVar(value=saved_dir)
-        ttk.Entry(dir_frame, textvariable=self.dir_var, width=48).pack(
-            side="left", padx=(8, 4), pady=6, fill="x", expand=True
-        )
-        ttk.Button(dir_frame, text="Browse", width=7, command=self._browse_dir).pack(
-            side="right", padx=(0, 8), pady=6
-        )
+        dir_entry = ttk.Entry(dir_frame, textvariable=self.dir_var, width=48)
+        dir_entry.pack(side="left", padx=(8, 4), pady=6, fill="x", expand=True)
+        browse_btn = ttk.Button(dir_frame, text="Browse", width=7, command=self._browse_dir)
+        browse_btn.pack(side="right", padx=(0, 8), pady=6)
+        self._input_widgets.extend([dir_entry, browse_btn])
 
         # Buttons row
         btn_frame = ttk.Frame(self)
@@ -239,7 +241,17 @@ class App(tk.Tk):
         if os.path.isdir(folder):
             os.startfile(folder)
 
-    # -- Download logic ----------------------------------------------------
+    # -- UI state helpers ---------------------------------------------------
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        for w in self._input_widgets:
+            # Combobox uses "readonly" instead of "normal"
+            if isinstance(w, ttk.Combobox) and enabled:
+                w.config(state="readonly")
+            else:
+                w.config(state=state)
+
+    # -- Download logic
     def _start_download(self) -> None:
         url = self.url_var.get().strip()
         if not url:
@@ -286,6 +298,7 @@ class App(tk.Tk):
         self.dl_btn.config(state="disabled")
         self.cancel_btn.config(state="normal")
         self.open_btn.config(state="disabled")
+        self._set_inputs_enabled(False)
         self.progress_var.set(0)
         self.status_var.set("Starting…")
 
@@ -366,6 +379,7 @@ class App(tk.Tk):
         self.dl_btn.config(state="normal")
         self.cancel_btn.config(state="disabled")
         self.open_btn.config(state="normal" if success else "disabled")
+        self._set_inputs_enabled(True)
 
 
 # ---------------------------------------------------------------------------
