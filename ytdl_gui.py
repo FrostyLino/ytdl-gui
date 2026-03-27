@@ -8,7 +8,10 @@ import subprocess
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -96,11 +99,11 @@ def build_command(url: str, fmt: str, quality: str, output_dir: str) -> list[str
 _PROGRESS_TPL = "YTDLGUI:%(progress._percent_str)s"
 
 
-class App(tk.Tk):
+class App(ttk.Window):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(themename="darkly")
         self.title("yt-dlp GUI")
-        self.minsize(480, 0)
+        self.minsize(500, 0)
         self.resizable(False, False)
         self._proc: subprocess.Popen | None = None
         self._downloading = False
@@ -133,17 +136,20 @@ class App(tk.Tk):
         self.geometry(f"+{x}+{y}")
 
     def _build_ui(self) -> None:
-        pad = {"padx": 12, "pady": 5}
+        pad = {"padx": 14, "pady": 6}
 
         # URL
-        url_frame = ttk.LabelFrame(self, text="YouTube URL")
+        url_frame = ttk.LabelFrame(self, text="YouTube URL", bootstyle="info")
         url_frame.pack(fill="x", **pad)
 
         self.url_var = tk.StringVar()
         url_entry = ttk.Entry(url_frame, textvariable=self.url_var, width=55)
-        url_entry.pack(side="left", padx=(8, 4), pady=6, fill="x", expand=True)
-        paste_btn = ttk.Button(url_frame, text="Paste", width=6, command=self._paste_url)
-        paste_btn.pack(side="right", padx=(0, 8), pady=6)
+        url_entry.pack(side="left", padx=(10, 4), pady=8, fill="x", expand=True)
+        paste_btn = ttk.Button(
+            url_frame, text="⎘ Paste", width=8, command=self._paste_url,
+            bootstyle="info-outline",
+        )
+        paste_btn.pack(side="right", padx=(0, 10), pady=8)
         self._input_widgets.extend([url_entry, paste_btn])
 
         # Format + Quality row
@@ -151,7 +157,7 @@ class App(tk.Tk):
         opts_frame.pack(fill="x", **pad)
 
         # Format
-        fmt_frame = ttk.LabelFrame(opts_frame, text="Format")
+        fmt_frame = ttk.LabelFrame(opts_frame, text="Format", bootstyle="info")
         fmt_frame.pack(side="left", fill="y", padx=(0, 6))
 
         saved_fmt = self._config.get("format", "mp4")
@@ -165,12 +171,13 @@ class App(tk.Tk):
                 value=val,
                 variable=self.fmt_var,
                 command=self._on_format_change,
+                bootstyle="info-toolbutton",
             )
-            rb.pack(side="left", padx=8, pady=6)
+            rb.pack(side="left", padx=6, pady=8)
             self._input_widgets.append(rb)
 
         # Quality
-        q_frame = ttk.LabelFrame(opts_frame, text="Quality")
+        q_frame = ttk.LabelFrame(opts_frame, text="Quality", bootstyle="info")
         q_frame.pack(side="left", fill="both", expand=True)
 
         self.quality_var = tk.StringVar()
@@ -180,7 +187,7 @@ class App(tk.Tk):
             state="readonly",
             width=14,
         )
-        self.quality_combo.pack(padx=8, pady=6)
+        self.quality_combo.pack(padx=10, pady=8)
         self._input_widgets.append(self.quality_combo)
         self._on_format_change()  # populate initial values
 
@@ -190,15 +197,18 @@ class App(tk.Tk):
             self.quality_var.set(saved_quality)
 
         # Output folder
-        dir_frame = ttk.LabelFrame(self, text="Save to")
+        dir_frame = ttk.LabelFrame(self, text="Save to", bootstyle="info")
         dir_frame.pack(fill="x", **pad)
 
         saved_dir = self._config.get("output_dir", DEFAULT_OUTPUT_DIR)
         self.dir_var = tk.StringVar(value=saved_dir)
         dir_entry = ttk.Entry(dir_frame, textvariable=self.dir_var, width=48)
-        dir_entry.pack(side="left", padx=(8, 4), pady=6, fill="x", expand=True)
-        browse_btn = ttk.Button(dir_frame, text="Browse", width=7, command=self._browse_dir)
-        browse_btn.pack(side="right", padx=(0, 8), pady=6)
+        dir_entry.pack(side="left", padx=(10, 4), pady=8, fill="x", expand=True)
+        browse_btn = ttk.Button(
+            dir_frame, text="Browse", width=8, command=self._browse_dir,
+            bootstyle="info-outline",
+        )
+        browse_btn.pack(side="right", padx=(0, 10), pady=8)
         self._input_widgets.extend([dir_entry, browse_btn])
 
         # Buttons row
@@ -206,19 +216,25 @@ class App(tk.Tk):
         btn_frame.pack(fill="x", **pad)
 
         self.dl_btn = ttk.Button(
-            btn_frame, text="Download", command=self._start_download
+            btn_frame, text="▶ Download", command=self._start_download,
+            bootstyle="success",
         )
         self.dl_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
 
         self.cancel_btn = ttk.Button(
-            btn_frame, text="Cancel", command=self._cancel_download, state="disabled"
+            btn_frame, text="✕ Cancel", command=self._cancel_download,
+            state="disabled", bootstyle="warning",
         )
         self.cancel_btn.pack(side="left", fill="x", expand=True, padx=(4, 4))
 
         self.open_btn = ttk.Button(
-            btn_frame, text="Open folder", command=self._open_folder, state="disabled"
+            btn_frame, text="📂 Open folder", command=self._open_folder,
+            state="disabled", bootstyle="secondary",
         )
         self.open_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
+
+        # Separator
+        ttk.Separator(self).pack(fill="x", padx=14, pady=(8, 0))
 
         # Progress
         prog_frame = ttk.Frame(self)
@@ -226,9 +242,10 @@ class App(tk.Tk):
 
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(
-            prog_frame, variable=self.progress_var, maximum=100
+            prog_frame, variable=self.progress_var, maximum=100,
+            bootstyle="success-striped",
         )
-        self.progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.pct_var = tk.StringVar(value="0 %")
         ttk.Label(prog_frame, textvariable=self.pct_var, width=6, anchor="e").pack(
@@ -236,10 +253,11 @@ class App(tk.Tk):
         )
 
         self.status_var = tk.StringVar(value="Ready")
-        self.status_label = tk.Label(
-            self, textvariable=self.status_var, anchor="w", fg="#555555",
+        self.status_label = ttk.Label(
+            self, textvariable=self.status_var, anchor="w",
+            bootstyle="secondary",
         )
-        self.status_label.pack(fill="x", padx=12, pady=(0, 10))
+        self.status_label.pack(fill="x", padx=14, pady=(0, 12))
 
     # -- Callbacks ---------------------------------------------------------
     def _paste_url(self) -> None:
@@ -386,7 +404,7 @@ class App(tk.Tk):
 
             # If cancelled, just reset — don't show error
             if self._cancelled:
-                self.after(0, self._set_status, "Cancelled.", "#e65100")
+                self.after(0, self._set_status, "Cancelled.", "warning")
                 self.after(0, self._reset_ui, False)
                 return
 
@@ -413,13 +431,13 @@ class App(tk.Tk):
         self.progress_var.set(pct)
         self.pct_var.set(f"{pct:.0f} %")
 
-    def _set_status(self, msg: str, color: str = "#555555") -> None:
+    def _set_status(self, msg: str, bootstyle: str = "secondary") -> None:
         self.status_var.set(msg)
-        self.status_label.config(fg=color)
+        self.status_label.config(bootstyle=bootstyle)
 
     def _download_finished(self, success: bool, msg: str) -> None:
         self._update_progress(100 if success else 0)
-        self._set_status(msg, color="#2e7d32" if success else "#c62828")
+        self._set_status(msg, bootstyle="success" if success else "danger")
         if success:
             self.url_var.set("")  # clear URL for next download
         self._reset_ui(success=success)
