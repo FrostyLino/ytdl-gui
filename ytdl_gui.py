@@ -100,6 +100,7 @@ class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("yt-dlp GUI")
+        self.minsize(480, 0)
         self.resizable(False, False)
         self._proc: subprocess.Popen | None = None
         self._downloading = False
@@ -109,6 +110,7 @@ class App(tk.Tk):
         self._config = load_config()
         self._input_widgets: list[tk.Widget] = []
         self._build_ui()
+        self._center_window()
         self._check_deps()
 
     # -- Dependency check --------------------------------------------------
@@ -123,8 +125,15 @@ class App(tk.Tk):
             )
 
     # -- UI ----------------------------------------------------------------
+    def _center_window(self) -> None:
+        self.update_idletasks()
+        w, h = self.winfo_width(), self.winfo_height()
+        x = (self.winfo_screenwidth() - w) // 2
+        y = (self.winfo_screenheight() - h) // 2
+        self.geometry(f"+{x}+{y}")
+
     def _build_ui(self) -> None:
-        pad = {"padx": 10, "pady": 4}
+        pad = {"padx": 12, "pady": 5}
 
         # URL
         url_frame = ttk.LabelFrame(self, text="YouTube URL")
@@ -212,16 +221,25 @@ class App(tk.Tk):
         self.open_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
         # Progress
+        prog_frame = ttk.Frame(self)
+        prog_frame.pack(fill="x", **pad)
+
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(
-            self, variable=self.progress_var, maximum=100
+            prog_frame, variable=self.progress_var, maximum=100
         )
-        self.progress_bar.pack(fill="x", **pad)
+        self.progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        self.pct_var = tk.StringVar(value="0 %")
+        ttk.Label(prog_frame, textvariable=self.pct_var, width=6, anchor="e").pack(
+            side="right"
+        )
 
         self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(self, textvariable=self.status_var, anchor="w").pack(
-            fill="x", padx=10, pady=(0, 8)
+        self.status_label = tk.Label(
+            self, textvariable=self.status_var, anchor="w", fg="#555555",
         )
+        self.status_label.pack(fill="x", padx=12, pady=(0, 10))
 
     # -- Callbacks ---------------------------------------------------------
     def _paste_url(self) -> None:
@@ -305,8 +323,8 @@ class App(tk.Tk):
         self.cancel_btn.config(state="normal")
         self.open_btn.config(state="disabled")
         self._set_inputs_enabled(False)
-        self.progress_var.set(0)
-        self.status_var.set("Starting…")
+        self._update_progress(0)
+        self._set_status("Starting…")
 
         cmd = build_command(
             url, self.fmt_var.get(), self.quality_var.get(), out_dir
@@ -359,16 +377,16 @@ class App(tk.Tk):
                             display_pct = 50 + raw_pct * 0.5
                         else:
                             display_pct = raw_pct  # audio-only = single pass
-                        self.after(0, self.progress_var.set, display_pct)
+                        self.after(0, self._update_progress, display_pct)
                 else:
                     # Show non-progress status lines (merging, extracting, etc.)
-                    self.after(0, self.status_var.set, line[:90])
+                    self.after(0, self._set_status, line[:90])
 
             self._proc.wait()
 
             # If cancelled, just reset — don't show error
             if self._cancelled:
-                self.after(0, self.status_var.set, "Cancelled.")
+                self.after(0, self._set_status, "Cancelled.", "#e65100")
                 self.after(0, self._reset_ui, False)
                 return
 
@@ -391,9 +409,17 @@ class App(tk.Tk):
         except Exception as exc:
             self.after(0, self._download_finished, False, str(exc))
 
-    def _download_finished(self, success: bool, msg: str) -> None:
-        self.progress_var.set(100 if success else 0)
+    def _update_progress(self, pct: float) -> None:
+        self.progress_var.set(pct)
+        self.pct_var.set(f"{pct:.0f} %")
+
+    def _set_status(self, msg: str, color: str = "#555555") -> None:
         self.status_var.set(msg)
+        self.status_label.config(fg=color)
+
+    def _download_finished(self, success: bool, msg: str) -> None:
+        self._update_progress(100 if success else 0)
+        self._set_status(msg, color="#2e7d32" if success else "#c62828")
         if success:
             self.url_var.set("")  # clear URL for next download
         self._reset_ui(success=success)
