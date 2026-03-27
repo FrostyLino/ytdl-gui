@@ -99,6 +99,7 @@ class App(tk.Tk):
         self.resizable(False, False)
         self._proc: subprocess.Popen | None = None
         self._downloading = False
+        self._cancelled = False
         self._last_error_lines: list[str] = []
         self._config = load_config()
         self._build_ui()
@@ -280,6 +281,7 @@ class App(tk.Tk):
         )
 
         self._downloading = True
+        self._cancelled = False
         self._last_error_lines.clear()
         self.dl_btn.config(state="disabled")
         self.cancel_btn.config(state="normal")
@@ -295,9 +297,8 @@ class App(tk.Tk):
 
     def _cancel_download(self) -> None:
         if self._proc and self._proc.poll() is None:
+            self._cancelled = True
             self._proc.kill()
-            self.after(0, self.status_var.set, "Cancelled.")
-            self.after(0, self._reset_buttons)
 
     def _run_download(self, cmd: list[str]) -> None:
         """Run yt-dlp in a subprocess and push progress updates to the GUI."""
@@ -326,6 +327,13 @@ class App(tk.Tk):
                 self.after(0, self.status_var.set, line[:90])
 
             self._proc.wait()
+
+            # If cancelled, just reset — don't show error
+            if self._cancelled:
+                self.after(0, self.status_var.set, "Cancelled.")
+                self.after(0, self._reset_ui, False)
+                return
+
             if self._proc.returncode == 0:
                 self.after(0, self._download_finished, True, "Download complete!")
             else:
@@ -346,14 +354,15 @@ class App(tk.Tk):
             self.after(0, self._download_finished, False, str(exc))
 
     def _download_finished(self, success: bool, msg: str) -> None:
-        self._downloading = False
-        self._proc = None
         self.progress_var.set(100 if success else 0)
         self.status_var.set(msg)
-        self._reset_buttons(success=success)
+        if success:
+            self.url_var.set("")  # clear URL for next download
+        self._reset_ui(success=success)
 
-    def _reset_buttons(self, success: bool = False) -> None:
+    def _reset_ui(self, success: bool = False) -> None:
         self._downloading = False
+        self._proc = None
         self.dl_btn.config(state="normal")
         self.cancel_btn.config(state="disabled")
         self.open_btn.config(state="normal" if success else "disabled")
