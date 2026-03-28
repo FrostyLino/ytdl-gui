@@ -139,7 +139,7 @@ class App(ttk.Window):
         pad = {"padx": 14, "pady": 6}
 
         # URL
-        url_frame = ttk.LabelFrame(self, text="YouTube URL", bootstyle="info")
+        url_frame = ttk.LabelFrame(self, text="YouTube URL")
         url_frame.pack(fill="x", **pad)
 
         self.url_var = tk.StringVar()
@@ -157,7 +157,7 @@ class App(ttk.Window):
         opts_frame.pack(fill="x", **pad)
 
         # Format
-        fmt_frame = ttk.LabelFrame(opts_frame, text="Format", bootstyle="info")
+        fmt_frame = ttk.LabelFrame(opts_frame, text="Format")
         fmt_frame.pack(side="left", fill="y", padx=(0, 6))
 
         saved_fmt = self._config.get("format", "mp4")
@@ -177,7 +177,7 @@ class App(ttk.Window):
             self._input_widgets.append(rb)
 
         # Quality
-        q_frame = ttk.LabelFrame(opts_frame, text="Quality", bootstyle="info")
+        q_frame = ttk.LabelFrame(opts_frame, text="Quality")
         q_frame.pack(side="left", fill="both", expand=True)
 
         self.quality_var = tk.StringVar()
@@ -197,7 +197,7 @@ class App(ttk.Window):
             self.quality_var.set(saved_quality)
 
         # Output folder
-        dir_frame = ttk.LabelFrame(self, text="Save to", bootstyle="info")
+        dir_frame = ttk.LabelFrame(self, text="Save to")
         dir_frame.pack(fill="x", **pad)
 
         saved_dir = self._config.get("output_dir", DEFAULT_OUTPUT_DIR)
